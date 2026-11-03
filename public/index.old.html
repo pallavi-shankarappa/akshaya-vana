@@ -1,0 +1,119 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Akshaya Vana · Project Tracker</title><link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌳</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--g:#1f6f43;--gd:#134b2d;--gl:#e7f4ec;--bg:#f5f8f6;--t:#1a2a22;--m:#6b7c73;--b:#dbe5df;--r:#c0392b;--c:#fff}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--t)}
+button,input,select,textarea{font:inherit}
+.btn{background:var(--g);color:#fff;border:0;padding:.6rem 1rem;border-radius:8px;cursor:pointer;font-weight:600}.btn:hover{background:var(--gd)}
+.btn.sec{background:#fff;color:var(--g);border:1px solid var(--b)}.btn.del{background:#fff;color:var(--r);border:1px solid var(--b)}.btn.sm{padding:.35rem .7rem;font-size:.85rem}
+header{background:var(--gd);color:#fff;display:flex;align-items:center;gap:1rem;padding:.8rem 1.2rem;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+header b{font-size:1.1rem;margin-right:auto}header a{color:#cfe8d9;text-decoration:none;padding:.4rem .8rem;border-radius:6px;cursor:pointer}header a.on{background:rgba(255,255,255,.15);color:#fff}
+header small{opacity:.8}main{max-width:1150px;margin:0 auto;padding:1.2rem}
+h2{margin:.2rem 0 1rem}.grid{display:grid;gap:1rem}.stats{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.two{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:1.1rem}.stat .n{font-size:2rem;font-weight:700;color:var(--g)}.stat span{color:var(--m);font-size:.9rem}
+.bar{height:9px;background:var(--gl);border-radius:9px;overflow:hidden;margin:.5rem 0}.bar i{display:block;height:100%;background:var(--g);border-radius:9px;transition:width .4s}
+.tag{display:inline-block;font-size:.75rem;padding:.15rem .55rem;border-radius:99px;background:var(--gl);color:var(--gd);font-weight:600}
+.tag.Completed{background:#d6e8ff;color:#1b4b8a}.tag.On{background:#ffe9c7;color:#8a5a00}.tag.Planned{background:#eee;color:#555}
+.toolbar{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}.toolbar input,.toolbar select{padding:.55rem;border:1px solid var(--b);border-radius:8px;background:#fff}.toolbar input{flex:1 1 220px;min-width:160px;width:auto}.toolbar select{width:auto;flex:0 0 auto}
+.p h3{margin:.4rem 0 .2rem}.p p{margin:.2rem 0;color:var(--m);font-size:.9rem}.row{display:flex;gap:.5rem;margin-top:.8rem}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:1rem;z-index:20;overflow:auto}
+.modal form,.auth{background:#fff;border-radius:14px;padding:1.4rem;width:100%;max-width:560px;max-height:92vh;overflow:auto}
+label{display:block;font-size:.85rem;font-weight:600;margin:.7rem 0 .25rem}input,select,textarea{width:100%;padding:.55rem;border:1px solid var(--b);border-radius:8px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}.err{background:#fdecea;color:var(--r);padding:.6rem;border-radius:8px;margin-top:.8rem;font-size:.9rem}
+.authwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem;background:linear-gradient(135deg,var(--gd),#3a9c68)}.auth{max-width:400px}
+.hint{font-size:.8rem;color:var(--m);background:var(--gl);padding:.6rem;border-radius:8px;margin-top:1rem}
+#toast{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);background:var(--gd);color:#fff;padding:.7rem 1.2rem;border-radius:8px;z-index:30;display:none}
+.hist{font-size:.82rem;color:var(--m);margin:.3rem 0;padding-left:1rem}.empty{text-align:center;color:var(--m);padding:2rem}
+@media(max-width:560px){.f2{grid-template-columns:1fr}main{padding:.8rem}}
+</style></head><body><div id="app"></div><div id="toast"></div>
+<script>
+const CATS=['Tree Plantation','Water Conservation','Waste Management','Renewable Energy','Biodiversity'],STATUS=['Planned','Active','On Hold','Completed'];
+let token=localStorage.t,user=JSON.parse(localStorage.u||'null'),view='dashboard',charts=[],reg=false;
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n).toLocaleString('en-IN'),pct=p=>Math.min(100,Math.round(p.current/p.target*100));
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)}
+async function api(path,method='GET',body){
+  const r=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',...(token&&{Authorization:'Bearer '+token})},body:body&&JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(r.status===401&&token){logout();throw new Error('Session expired')}
+  if(!r.ok)throw new Error(d.error||'Request failed');return d}
+function logout(){localStorage.clear();token=user=null;render()}
+const canEdit=p=>user.role==='admin'||(user.role==='manager'&&p.owner===user.id);
+
+function render(){charts.forEach(c=>c.destroy());charts=[];
+  if(!token)return authView();
+  $('#app').innerHTML=`<header><b>🌳 Akshaya Vana</b>
+   <a class="${view=='dashboard'?'on':''}" onclick="go('dashboard')">Dashboard</a><a class="${view=='projects'?'on':''}" onclick="go('projects')">Projects</a>${user.role=='admin'?`<a class="${view=='users'?'on':''}" onclick="go('users')">Users</a>`:''}
+   <a class="${view=='profile'?'on':''}" onclick="go('profile')" title="My account">👤 ${esc(user.name)} · ${user.role}</a><a onclick="logout()">Logout</a></header><main id="main"></main>`;
+  view=='dashboard'?dashboard():view=='users'?users():view=='profile'?profile():projects()}
+const go=v=>{view=v;render()};
+
+function authView(){$('#app').innerHTML=`<div class="authwrap"><form class="auth" id="af"><h2>🌳 Akshaya Vana</h2><p style="color:var(--m);margin-top:-.6rem">Environmental Project Tracker</p>
+ ${reg?'<label>Name</label><input id="an" required>':''}<label>Email</label><input id="ae" type="email" required><label>Password</label><input id="ap" type="password" required minlength="6">
+ <div id="ae2"></div><button class="btn" style="width:100%;margin-top:1rem">${reg?'Create account':'Log in'}</button>
+ <p style="text-align:center"><a href="#" id="sw">${reg?'Have an account? Log in':'New here? Register'}</a></p>
+ <div class="hint"><b>Demo logins</b> (password <code>Password@123</code>)<br>admin@ · manager@ · viewer@ <code>akshayavana.com</code></div></form></div>`;
+ $('#sw').onclick=e=>{e.preventDefault();reg=!reg;authView()};
+ $('#af').onsubmit=async e=>{e.preventDefault();try{
+  const d=await api(reg?'/auth/register':'/auth/login','POST',{name:reg?$('#an').value:undefined,email:$('#ae').value,password:$('#ap').value});
+  token=d.token;user=d.user;localStorage.t=token;localStorage.u=JSON.stringify(user);render()}catch(x){$('#ae2').innerHTML=`<div class="err">${esc(x.message)}</div>`}}}
+
+async function dashboard(){const m=$('#main');m.innerHTML='<p class="empty">Loading…</p>';
+  try{const s=await api('/stats');
+  m.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><h2>Dashboard</h2>${s.db!=='Connected'?`<span class="tag" style="background:var(--r);color:#fff">⚠️ DB ${s.db}</span>`:''}</div>
+  <div class="grid stats">
+ ${[['Total projects',s.total],['Active',s.active],['Completed',s.completed],['Avg. progress',s.avgProgress+'%']].map(([l,n])=>`<div class="card stat"><div class="n">${n}</div><span>${l}</span></div>`).join('')}</div>
+ <div class="grid two" style="margin-top:1rem"><div class="card"><h3>Projects by status</h3><canvas id="c1"></canvas></div>
+ <div class="card"><h3>Progress by category (%)</h3><canvas id="c2"></canvas></div>
+ <div class="card"><h3>Projects by location</h3><canvas id="c3"></canvas></div>
+ <div class="card"><h3>Recent progress updates</h3>${s.recent.length?s.recent.map(h=>`<p class="hist"><b>${esc(h.project)}</b>: ${fmt(h.from)} → ${fmt(h.to)} ${esc(h.unit)}<br>by ${esc(h.by)} · ${new Date(h.at).toLocaleDateString()}</p>`).join(''):'<p class="empty">No updates yet</p>'}</div></div>`;
+ if(typeof Chart==='undefined'){toast('Charts could not load - check your internet');return}
+ const col=['#1f6f43','#3a9c68','#8fc9a5','#e0a526','#2f6db5'],o={plugins:{legend:{position:'bottom'}}};
+ charts.push(new Chart($('#c1'),{type:'doughnut',data:{labels:s.byStatus.map(x=>x.name),datasets:[{data:s.byStatus.map(x=>x.count),backgroundColor:col}]},options:o}),
+  new Chart($('#c2'),{type:'bar',data:{labels:s.byCategory.map(x=>x.name),datasets:[{data:s.byCategory.map(x=>x.progress),backgroundColor:'#1f6f43'}]},options:{plugins:{legend:{display:false}},scales:{y:{max:100,beginAtZero:true}}}}),
+  new Chart($('#c3'),{type:'bar',data:{labels:s.byLocation.map(x=>x.name),datasets:[{data:s.byLocation.map(x=>x.count),backgroundColor:'#3a9c68'}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}}}}))
+ }catch(e){m.innerHTML=`<div class="err">${esc(e.message)}</div>`}}
+
+async function projects(){const m=$('#main');
+ m.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem"><h2>Projects</h2>${user.role!='viewer'?'<button class="btn" id="new">+ New project</button>':''}</div>
+ <div class="toolbar"><input id="q" placeholder="Search projects…"><select id="fs"><option value="">All statuses</option>${STATUS.map(s=>`<option>${s}</option>`).join('')}</select><select id="fc"><option value="">All categories</option>${CATS.map(s=>`<option>${s}</option>`).join('')}</select></div><div id="list" class="grid two"></div>`;
+ let t;const load=async()=>{try{const ps=await api(`/projects?search=${encodeURIComponent($('#q').value)}&status=${$('#fs').value}&category=${$('#fc').value}`);window.PS=ps;
+  $('#list').innerHTML=ps.length?ps.map(p=>`<div class="card p"><span class="tag ${p.status.split(' ')[0]}">${p.status}</span> <span class="tag">${esc(p.category)}</span>
+   <h3>${esc(p.name)}</h3><p>📍 ${esc(p.location)} · 👤 ${esc(p.ownerName)}</p><p>${esc(p.description)}</p>
+   <div class="bar"><i style="width:${pct(p)}%"></i></div><b>${fmt(p.current)}</b> / ${fmt(p.target)} ${esc(p.unit)} · ${pct(p)}%
+   ${canEdit(p)?`<div class="row"><button class="btn sm sec" onclick="openForm('${p._id}')">Edit</button><button class="btn sm del" onclick="del('${p._id}')">Delete</button></div>`:''}</div>`).join(''):'<p class="empty">No projects found</p>'}catch(e){toast(e.message)}};
+ $('#q').oninput=()=>{clearTimeout(t);t=setTimeout(load,300)};$('#fs').onchange=$('#fc').onchange=load;if($('#new'))$('#new').onclick=()=>openForm();load()}
+
+function openForm(id){const p=id?PS.find(x=>x._id==id):{status:'Planned',category:CATS[0],current:0,unit:'trees'};
+ const d=document.createElement('div');d.className='modal';const v=k=>esc(p[k]),dt=k=>p[k]?p[k].slice(0,10):'';
+ d.innerHTML=`<form><h2>${id?'Edit':'New'} project</h2><label>Name</label><input id="f_name" value="${v('name')}" required>
+ <label>Location</label><input id="f_location" value="${v('location')}" required>
+ <div class="f2"><div><label>Category</label><select id="f_category">${CATS.map(c=>`<option ${c==p.category?'selected':''}>${c}</option>`).join('')}</select></div>
+ <div><label>Status</label><select id="f_status">${STATUS.map(c=>`<option ${c==p.status?'selected':''}>${c}</option>`).join('')}</select></div>
+ <div><label>Target</label><input id="f_target" type="number" min="1" value="${v('target')}" required></div>
+ <div><label>Progress so far</label><input id="f_current" type="number" min="0" value="${v('current')}" required></div>
+ <div><label>Unit (trees, kW…)</label><input id="f_unit" value="${v('unit')}"></div><div></div>
+ <div><label>Start</label><input id="f_startDate" type="date" value="${dt('startDate')}"></div><div><label>End</label><input id="f_endDate" type="date" value="${dt('endDate')}"></div></div>
+ <label>Description</label><textarea id="f_description" rows="2">${v('description')}</textarea>
+ ${p.history?.length?`<label>Progress history</label>${p.history.slice(-4).reverse().map(h=>`<p class="hist">${fmt(h.from)} → ${fmt(h.to)} by ${esc(h.by)} (${new Date(h.at).toLocaleDateString()})</p>`).join('')}`:''}
+ <div id="ferr"></div><div class="row"><button class="btn">Save</button><button type="button" class="btn sec" id="cx">Cancel</button></div></form>`;
+ document.body.appendChild(d);$('#cx').onclick=()=>d.remove();
+ d.querySelector('form').onsubmit=async e=>{e.preventDefault();const b={};
+  ['name','location','category','status','target','current','unit','startDate','endDate','description'].forEach(k=>b[k]=$('#f_'+k).value);
+  try{await api(id?'/projects/'+id:'/projects',id?'PUT':'POST',b);d.remove();toast('Saved');projects()}catch(x){$('#ferr').innerHTML=`<div class="err">${esc(x.message)}</div>`}}}
+function profile(){
+ const perms={admin:['View all projects and the dashboard','Create, edit and delete any project','Manage users: change roles and remove accounts'],manager:['View all projects and the dashboard','Create new projects','Edit and delete only your own projects'],viewer:['View projects and the dashboard','Read-only: cannot create, edit or delete']};
+ $('#main').innerHTML=`<h2>My account</h2><div class="card" style="max-width:520px"><h3 style="margin-top:0">${esc(user.name)} <span class="tag">${user.role}</span></h3>
+ <p style="color:var(--m)">${esc(user.email||'Log out and log in again to show your email')}</p><label>Your permissions</label><ul>${perms[user.role].map(x=>`<li>${x}</li>`).join('')}</ul>
+ <div class="row">${user.role=='admin'?`<button class="btn" onclick="go('users')">Manage users</button>`:''}<button class="btn sec" onclick="logout()">Logout</button></div></div>`}
+async function users(){const m=$('#main');
+ try{const us=await api('/users');
+ m.innerHTML=`<h2>User management</h2><div class="card" style="overflow:auto"><table style="width:100%;border-collapse:collapse"><tr style="text-align:left"><th>Name</th><th>Email</th><th>Role</th><th></th></tr>
+ ${us.map(u=>`<tr style="border-top:1px solid var(--b)"><td style="padding:.6rem 0">${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u._id==user.id?`<span class="tag">${u.role} (you)</span>`:`<select style="width:auto" onchange="setRole('${u._id}',this.value)">${['admin','manager','viewer'].map(r=>`<option ${r==u.role?'selected':''}>${r}</option>`).join('')}</select>`}</td><td>${u._id==user.id?'':`<button class="btn sm del" onclick="delUser('${u._id}')">Remove</button>`}</td></tr>`).join('')}</table></div>`}
+ catch(e){m.innerHTML=`<div class="err">${esc(e.message)}</div>`}}
+async function setRole(id,role){try{await api('/users/'+id+'/role','PUT',{role});toast('Role updated')}catch(e){toast(e.message)}users()}
+async function delUser(id){if(!confirm('Remove this user?'))return;try{await api('/users/'+id,'DELETE');toast('User removed')}catch(e){toast(e.message)}users()}
+async function del(id){if(!confirm('Delete this project permanently?'))return;try{await api('/projects/'+id,'DELETE');toast('Deleted');projects()}catch(e){toast(e.message)}}
+render();
+</script></body></html>
