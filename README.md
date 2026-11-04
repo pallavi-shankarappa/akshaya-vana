@@ -10,14 +10,13 @@ Akshaya Vana is a professional, production-ready environmental project tracker d
 - **Progress Tracking:** Interactive progress bars with precise calculations. Automatic tracking of remaining targets and progress history logs.
 - **Role-Based Access Control (RBAC):**
   - **Admin:** Full system control, user management, and project oversight.
-  - **Manager:** Create and manage authorized projects.
   - **Viewer:** Read-only access to dashboard and projects.
 - **Security:** JWT-based authentication, bcrypt password hashing, input sanitization, and backend-enforced permissions.
 - **Responsive Design:** Optimized for Desktop, Tablet, and Mobile devices.
 
 ## 🛠 Tech Stack
 
-- **Frontend:** HTML5, Modern CSS3 (Custom properties, Flexbox/Grid), Vanilla JavaScript (ES6+), Chart.js, Lucide Icons.
+- **Frontend:** HTML5, Modern CSS3 ,react js
 - **Backend:** Node.js, Express.js.
 - **Database:** MongoDB with Mongoose ODM.
 - **Authentication:** JSON Web Tokens (JWT) & bcrypt.js.
@@ -67,13 +66,12 @@ akshaya-vana/
 | Role | Email | Password |
 | :--- | :--- | :--- |
 | **Admin** | `admin@akshayavana.com` | `Password@123` |
-| **Manager** | `manager@akshayavana.com` | `Password@123` |
 | **Viewer** | `viewer@akshayavana.com` | `Password@123` |
 
 ## 🧪 Testing Performed
 
 - [x] **Authentication:** Verified registration, login, and JWT token persistence.
-- [x] **RBAC:** Confirmed that Viewers cannot edit/delete and Managers can only edit their own projects.
+- [x] **RBAC:** Confirmed that Viewers cannot edit/delete and admins can only edit  projects.
 - [x] **Progress Logic:** Tested "Target 1000, Progress 600 -> 850" flow. Verified that progress cannot exceed targets or be negative.
 - [x] **Real-time Analytics:** Verified that adding/updating projects reflects immediately in dashboard charts and stats.
 - [x] **Responsiveness:** Tested on Mobile (375px), Tablet (768px), and Desktop (1440px).
